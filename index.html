@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>동네할인 지도 (VWorld 3D)</title>
+<!-- VWorld API 키: 키를 발급받을 때 등록한 도메인(주소)에서 열어야 동작해요 -->
+<script src="https://map.vworld.kr/js/webglMapInit.js.do?version=3.0&apiKey=E17E242F-B426-4742-8BC1-45C8155B936D"></script>
+<style>
+:root{--bg:#FFF1DC;--road:#E4D4FF;--ink:#3B2A5A;--sheet:#FFFBF5;--line:#F0DFC6;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#2A1F45;--road:#47346F;--ink:#FFEFD9;--sheet:#35275A;--line:#4C3A7A}}
+:root[data-theme="dark"]{--bg:#2A1F45;--road:#47346F;--ink:#FFEFD9;--sheet:#35275A;--line:#4C3A7A}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Jua","Noto Sans KR","Apple SD Gothic Neo",sans-serif;overflow:hidden}
+#top{position:absolute;left:0;right:0;top:env(safe-area-inset-top,0px);z-index:5;padding:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{border:0;border-radius:99px;padding:7px 13px;font:inherit;font-size:14px;background:var(--sheet);color:var(--ink);box-shadow:0 2px 0 var(--line);cursor:pointer}
+.chip.on{background:#FF5FA2;color:#fff}
+.chip:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #4D96FF;outline-offset:2px}
+#vmap{position:absolute;inset:0;width:100%;height:100%}
+#ov{position:absolute;inset:0;z-index:3;overflow:hidden;pointer-events:none}
+.g{position:absolute;left:0;top:0;width:0;height:0;cursor:pointer}.g *{pointer-events:auto}
+.d{position:absolute;border-radius:50%;border:2px solid #fff;box-sizing:border-box}
+.d.u::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:2px solid currentColor;animation:pg 1.4s infinite}
+@keyframes pg{to{transform:scale(2);opacity:0}}
+.lb{position:absolute;transform:translateX(-50%);white-space:nowrap;font-size:12px;color:#3B2A5A;text-shadow:0 0 3px #fff,0 0 3px #fff}
+#legend{position:absolute;left:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:4;display:flex;flex-wrap:wrap;gap:5px;max-width:70%}
+.lg{font-size:12px;padding:3px 9px;border-radius:99px;color:#fff}
+#fab{position:absolute;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:4;width:58px;height:58px;border:0;border-radius:50%;background:#FF8A3D;color:#fff;font-size:30px;box-shadow:0 4px 0 #D96A1F;cursor:pointer}
+#zoom{position:absolute;right:12px;top:calc(60px + env(safe-area-inset-top,0px));z-index:4;display:flex;flex-direction:column;gap:6px}
+#sheet{position:absolute;left:0;right:0;bottom:0;z-index:6;background:var(--sheet);border-radius:22px 22px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));max-height:62%;overflow:auto;box-shadow:0 -4px 0 var(--line);transform:translateY(105%);transition:transform .25s}
+#sheet.open{transform:none}
+.row{display:flex;gap:10px;padding:10px 0;border-bottom:2px dashed var(--line)}
+.dot{width:14px;height:14px;border-radius:50%;margin-top:4px;flex:none}
+.row b{font-weight:400;font-size:16px}
+.sub{font-size:13px;opacity:.8}
+.acts{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.acts button:disabled{opacity:.6;cursor:default}
+.acts button{border:0;border-radius:99px;padding:5px 10px;font:inherit;font-size:12px;background:var(--line);color:var(--ink);cursor:pointer}
+label{display:block;font-size:13px;margin:8px 0 3px}
+input,select{width:100%;box-sizing:border-box;padding:9px;border-radius:12px;border:2px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
+.go{margin-top:12px;width:100%;border:0;border-radius:14px;padding:12px;background:#2EC4B6;color:#fff;font:inherit;font-size:16px;cursor:pointer}
+@keyframes pulse{0%{r:15;opacity:.9}100%{r:26;opacity:0}}
+@keyframes pulse2{0%{r:6;opacity:.9}100%{r:15;opacity:0}}
+.pr2{animation:pulse2 1.4s infinite;fill:none;stroke-width:2}
+.pr{animation:pulse 1.4s infinite;fill:none;stroke-width:3}
+@media (prefers-reduced-motion:reduce){.pr,.pr2{animation:none}#sheet{transition:none}}
+</style>
+</head>
+<body>
+<div id="top"></div>
+<div id="zoom"><button class="chip" id="zi" aria-label="확대">＋</button><button class="chip" id="zo" aria-label="축소">－</button></div>
+<div id="st" style="position:absolute;left:10px;top:calc(56px + env(safe-area-inset-top,0px));z-index:8;font-size:11px;background:#3B2A5Acc;color:#fff;padding:3px 8px;border-radius:8px;max-width:75%"></div>
+<div id="vmap"></div><div id="ov"></div>
+<div id="legend"></div>
+<div id="hint" style="position:absolute;left:12px;bottom:calc(78px + env(safe-area-inset-bottom,0px));z-index:4;font-size:12px">점이 클수록, 밝을수록 믿을 수 있어요</div>
+<button id="fab" aria-label="할인 제보하기">＋</button>
+<div id="sheet" role="dialog"></div>
+<script>
+const CAT={food:["음식","#FF8A3D"],cafe:["카페","#FF5FA2"],shop:["쇼핑","#9B5DE5"],beauty:["뷰티","#2EC4B6"],fun:["놀거리","#4D96FF"],etc:["기타","#FFC93C"]};
+const MIN=60000,now=()=>Date.now();
+const B=[
+{id:1,n:"행복빌딩",x:-50,y:-30,w:34,d:28,f:5,h:330},{id:2,n:"모아상가",x:40,y:-60,w:40,d:26,f:4,h:15},
+{id:3,n:"별빛타워",x:-30,y:60,w:30,d:30,f:7,h:200},{id:4,n:"골목시장",x:90,y:40,w:44,d:24,f:2,h:50},
+{id:5,n:"청춘플라자",x:-140,y:-110,w:36,d:30,f:6,h:280},{id:6,n:"솜사탕몰",x:150,y:-130,w:40,d:34,f:5,h:310},
+{id:7,n:"하늘센터",x:-170,y:150,w:34,d:34,f:8,h:170},{id:8,n:"달빛빌라",x:230,y:130,w:30,d:28,f:3,h:20}];
+let S=[
+{id:1,b:1,fl:1,n:"달콤카페",c:"cafe",t:"아메리카노 1+1",end:90,age:10,ok:4,no:0,rp:0},
+{id:2,b:1,fl:2,n:"스타일온",c:"shop",t:"전 상품 30% 할인",end:200,age:60,ok:2,no:0,rp:0},
+{id:3,b:1,fl:3,n:"네일하우스",c:"beauty",t:"젤네일 5천원 할인",end:25,age:5,ok:1,no:0,rp:0},
+{id:4,b:1,fl:5,n:"방탈출왕",c:"fun",t:"2인 이상 3천원 할인",end:300,age:120,ok:0,no:0,rp:0},
+{id:5,b:2,fl:1,n:"오늘의김밥",c:"food",t:"마감 30% 할인",end:40,age:15,ok:3,no:0,rp:0},
+{id:6,b:2,fl:2,n:"책방콩",c:"etc",t:"중고책 2권 구매 시 1권",end:500,age:30,ok:1,no:0,rp:0},
+{id:7,b:3,fl:1,n:"치킨마루",c:"food",t:"2마리 시 음료 무료",end:120,age:40,ok:2,no:0,rp:0},
+{id:8,b:4,fl:1,n:"떡볶이천국",c:"food",t:"세트 2천원 할인",end:60,age:8,ok:5,no:0,rp:0},
+{id:9,b:4,fl:2,n:"과일가게",c:"etc",t:"딸기 한 팩 4천원",end:35,age:20,ok:2,no:0,rp:0},
+{id:10,b:5,fl:1,n:"빵굽는날",c:"food",t:"마감 빵 50%",end:70,age:25,ok:1,no:0,rp:0},
+{id:11,b:6,fl:2,n:"뷰티랩",c:"beauty",t:"마스크팩 3+1",end:240,age:90,ok:0,no:0,rp:0},
+{id:12,b:7,fl:4,n:"보드게임카페",c:"cafe",t:"두 시간 이용 시 음료 무료",end:180,age:50,ok:1,no:0,rp:0}
+].map(s=>({...s,cr:now()-s.age*MIN,end:now()+s.end*MIN}));
+const V={},RP={};
+let R=300,Z=1,admin=false,sel=null,uid=20,me={x:0,y:0};
+const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const live=()=>S.filter(s=>s.end>now()&&s.rp<3&&s.no<2);
+const dist=b=>Math.hypot(b.x+b.w/2-me.x,b.y+b.d/2-me.y);
+function left(s){const m=Math.max(0,Math.round((s.end-now())/MIN));return m>=60?Math.floor(m/60)+"시간 "+(m%60)+"분":m+"분"}
+function trust(s){return Math.max(0,Math.min(1,(s.ok+1-s.no*2)/5))}
+function vb(s){const i=s.id;let t="";
+ if(s.mine)t=`<span class="sub">내가 올린 제보예요</span>`;
+ else if(V[i])t=`<button disabled>${V[i]==="ok"?"👍 확인 완료":"👎 알림 완료"}</button>`;
+ else t=`<button data-a="ok" data-i="${i}">👍 아직 해요</button><button data-a="no" data-i="${i}">👎 끝났대요</button>`;
+ if(!s.mine&&!RP[i])t+=`<button data-a="rp" data-i="${i}">🚩 신고</button>`;return t}
+function rad(s){return 3.5+6*trust(s)}
+function lv(s){return Math.round(trust(s)*3)}
+function glow(s){const t=trust(s),c=CAT[s.c][1];return t<.35?"":`filter:drop-shadow(0 0 ${2+6*t}px ${c})`+(t>.7?` drop-shadow(0 0 ${4+8*t}px ${c})`:"")}
+function fresh(s){return Math.max(.5,1-(now()-s.cr)/(3*60*MIN))}
+const st=m=>{const e=$("st");if(e)e.textContent=m};
+const C={lon:126.63971,lat:37.39667},mx=111320*Math.cos(C.lat*Math.PI/180),my=110540;
+const ll=(x,y)=>[C.lon+x/mx,C.lat-y/my];
+let map,scene,anch=[],mode=0;
+let booted=false;
+function boot(){
+ if(booted)return;
+ try{
+  if(!(window.ws3d&&ws3d.viewer&&ws3d.viewer.scene))return;
+  booted=true;scene=ws3d.viewer.scene;
+  try{map.getLayerElement("명칭").hide()}catch(e){}
+  ["건물","facility_build"].forEach(n=>{try{const l=map.getLayerElement(n);l&&l.show&&l.show()}catch(e){}});
+  try{scene.camera.setView({destination:Cesium.Cartesian3.fromDegrees(C.lon,C.lat-0.0045,400),orientation:{heading:0,pitch:Cesium.Math.toRadians(-50),roll:0}})}catch(e){}
+  scene.postRender.addEventListener(place);render();
+  st("3D 준비됨 · 점이 있는 건물 "+anch.length+"곳");
+ }catch(e){st("오류: "+e.message)}
+}
+function initMap(){
+ if(typeof vw==="undefined"){const d=document.createElement("div");d.style.cssText="position:absolute;top:70px;left:10px;right:10px;z-index:9;background:#FF5FA2;color:#fff;padding:10px;border-radius:10px;font-size:13px";
+  d.textContent="VWorld 지도를 불러오지 못했어요. API 키에 등록한 도메인(주소)에서 열었는지 확인해 주세요. 현재 주소: "+location.origin;document.body.appendChild(d);return}
+ st("지도 시작 중… 3D 엔진 준비를 기다리고 있어요");
+ vw.ws3dInitCallBack=boot;
+ map=new vw.Map();
+ map.setOption({mapId:"vmap",initPosition:new vw.CameraPosition(new vw.CoordZ(C.lon,C.lat-0.0045,400),new vw.Direction(0,-50,0)),logo:false,navigation:true});
+ map.start();
+ const t0=Date.now(),iv=setInterval(()=>{boot();if(booted)clearInterval(iv);else if(Date.now()-t0>20000){clearInterval(iv);st("3D 엔진이 20초 안에 준비되지 않았어요 (키·도메인 인증 문제일 수 있어요)")}},500);
+}
+const toWin=(p)=>(Cesium.SceneTransforms.worldToWindowCoordinates||Cesium.SceneTransforms.wgs84ToWindowCoordinates)(scene,p);
+function render(){
+ if(!scene)return;
+ const ov=$("ov"),hi=scene.camera.positionCartographic.height<300;mode=hi?1:0;ov.innerHTML="";anch=[];const L=live();
+ B.filter(b=>dist(b)<=R).forEach(b=>{
+  const sh=L.filter(s=>s.b===b.id);if(!sh.length)return;
+  const [lo,la]=ll(b.x+b.w/2,b.y+b.d/2),pos=Cesium.Cartesian3.fromDegrees(lo,la,b.f*4+3);
+  const g=document.createElement("div");g.className="g";
+  const n=sh.length,cols=Math.ceil(Math.sqrt(n)),rows=Math.ceil(n/cols),sp=hi?24:15;
+  sh.forEach((s,i)=>{const r=rad(s),d=document.createElement("div"),c=CAT[s.c][1];
+   d.className="d"+(s.end-now()<30*MIN?" u":"");
+   d.style.cssText=`width:${r*2}px;height:${r*2}px;left:${((i%cols)-(cols-1)/2)*sp-r}px;top:${(Math.floor(i/cols)-(rows-1)/2)*sp-r}px;background:${c};color:${c};opacity:${.35+.65*trust(s)};${glow(s)}`;
+   g.appendChild(d)});
+  if(hi){const l=document.createElement("div");l.className="lb";l.style.top=(-(rows*sp)/2-24)+"px";l.textContent=b.n;g.appendChild(l)}
+  g.onclick=()=>{sel=b.id;sheet()};
+  ov.appendChild(g);anch.push({g,pos});
+ });
+ place();
+ if(sel&&$("sheet").dataset.m==="list")sheet(true);
+}
+function place(){
+ if(!scene)return;
+ if((scene.camera.positionCartographic.height<300?1:0)!==mode){render();return}
+ const cam=scene.camera;
+ anch.forEach(a=>{const v=Cesium.Cartesian3.subtract(a.pos,cam.positionWC,new Cesium.Cartesian3()),p=Cesium.Cartesian3.dot(v,cam.directionWC)>0?toWin(a.pos):undefined;if(!p){a.g.style.display="none";return}a.g.style.display="";a.g.style.transform=`translate(${p.x}px,${p.y}px)`});
+}
+function sheet(keep){
+ const b=B.find(x=>x.id===sel),sh=live().filter(s=>s.b===sel).sort((a,c)=>c.fl-a.fl),el=$("sheet");
+ el.dataset.m="list";
+ el.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:20px;font-weight:400">${esc(b.n)}</b><button class="chip" id="x">닫기</button></div>`+
+ (sh.length?sh.map(s=>`<div class="row"><span class="dot" style="width:${rad(s)*2}px;height:${rad(s)*2}px;margin-top:${11-rad(s)}px;background:${CAT[s.c][1]};opacity:${.35+.65*trust(s)};${glow(s)}"></span><div style="flex:1"><b>${s.fl}층 ${esc(s.n)}</b> <span class="sub">${CAT[s.c][0]}</span><div>${esc(s.t)}</div><div class="sub">${left(s)} 남음 · 신뢰도 ${"●".repeat(lv(s))}${"○".repeat(3-lv(s))} · 확인 ${s.ok}명</div>
+ <div class="acts">${vb(s)}${admin?`<button data-a="del" data-i="${s.id}" style="background:#FF5FA2;color:#fff">🗑 삭제</button>`:""}</div></div></div>`).join(""):`<p>진행 중인 할인이 없어요. 첫 제보를 올려보세요!</p>`);
+ el.classList.add("open");$("x").onclick=()=>{el.classList.remove("open");sel=null};
+ el.querySelectorAll("[data-a]").forEach(e=>e.onclick=()=>{const s=S.find(v=>v.id==e.dataset.i),a=e.dataset.a;
+  if(a==="del")S=S.filter(v=>v!==s);else if(a==="rp"){if(!RP[s.id]){RP[s.id]=1;s.rp++}}else if(!V[s.id]&&!s.mine){V[s.id]=a;s[a]++;if(a==="ok")s.end+=10*MIN}render();sheet()});
+}
+function form(){
+ const el=$("sheet");el.dataset.m="form";
+ el.innerHTML=`<div style="display:flex;justify-content:space-between"><b style="font-size:20px;font-weight:400">할인 제보하기</b><button class="chip" id="x">닫기</button></div>
+ <label>건물</label><select id="fb">${B.filter(b=>dist(b)<=R).map(b=>`<option value="${b.id}" ${b.id===sel?"selected":""}>${esc(b.n)}</option>`).join("")}</select>
+ <label>층</label><input id="ff" type="number" min="1" max="10" value="1">
+ <label>가게 이름</label><input id="fn" maxlength="20" placeholder="예: 달콤카페">
+ <label>카테고리</label><select id="fc">${Object.entries(CAT).map(([k,v])=>`<option value="${k}">${v[0]}</option>`).join("")}</select>
+ <label>할인 내용</label><input id="ft" maxlength="40" placeholder="예: 전 메뉴 20% 할인">
+ <label>언제까지?</label><select id="fe"><option value="30">30분</option><option value="60" selected>1시간</option><option value="180">3시간</option><option value="600">오늘 마감까지</option></select>
+ <button class="go" id="go">올리기</button>`;
+ el.classList.add("open");$("x").onclick=()=>el.classList.remove("open");
+ $("go").onclick=()=>{const n=$("fn").value.trim(),t=$("ft").value.trim();if(!n||!t){alert("가게 이름과 할인 내용을 입력해 주세요.");return}
+  S.push({id:++uid,b:+$("fb").value,fl:+$("ff").value||1,n,c:$("fc").value,t,cr:now(),end:now()+$("fe").value*MIN,ok:0,no:0,rp:0,mine:true});
+  sel=+$("fb").value;render();sheet()};
+}
+function ui(){
+ $("top").innerHTML=[100,300,500].map(r=>`<button class="chip ${r===R?"on":""}" data-r="${r}">${r<1000?r+"m":""}</button>`).join("")+
+ `<button class="chip ${admin?"on":""}" id="ad">${admin?"관리자 모드 켬":"관리자"}</button>`;
+ $("top").querySelectorAll("[data-r]").forEach(e=>e.onclick=()=>{R=+e.dataset.r;ui();render()});
+ $("ad").onclick=()=>{admin=!admin;ui();if(sel)sheet()};
+}
+$("legend").innerHTML=Object.values(CAT).concat([]).map(v=>`<span class="lg" style="background:${v[1]}">${v[0]}</span>`).join("");
+$("fab").onclick=form;
+$("zi").onclick=()=>{if(scene)scene.camera.zoomIn(scene.camera.positionCartographic.height*.4)};
+$("zo").onclick=()=>{if(scene)scene.camera.zoomOut(scene.camera.positionCartographic.height*.6)};
+addEventListener("error",e=>{if(!e.message||e.message==="Script error.")return;const d=document.createElement("div");d.style.cssText="position:absolute;top:70px;left:10px;right:10px;z-index:9;background:#FF5FA2;color:#fff;padding:8px;border-radius:10px;font-size:12px";d.textContent="오류: "+e.message;document.body.appendChild(d)});
+addEventListener("resize",render);setInterval(render,30000);
+ui();initMap();
+</script>
+</body>
+</html>
