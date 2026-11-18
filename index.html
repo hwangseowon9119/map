@@ -180,8 +180,8 @@ function ui(){
 }
 $("legend").innerHTML=Object.values(CAT).concat([]).map(v=>`<span class="lg" style="background:${v[1]}">${v[0]}</span>`).join("");
 $("fab").onclick=form;
-$("zi").onclick=()=>{if(scene)scene.camera.zoomIn(scene.camera.positionCartographic.height*.4)};
-$("zo").onclick=()=>{if(scene)scene.camera.zoomOut(scene.camera.positionCartographic.height*.6)};
+$("zi").onclick=()=>{if(!scene){st("아직 3D 엔진이 준비되지 않았어요");return}if(scene)scene.camera.zoomIn(scene.camera.positionCartographic.height*.4)};
+$("zo").onclick=()=>{if(!scene){st("아직 3D 엔진이 준비되지 않았어요");return}if(scene)scene.camera.zoomOut(scene.camera.positionCartographic.height*.6)};
 addEventListener("error",e=>{if(!e.message||e.message==="Script error.")return;const d=document.createElement("div");d.style.cssText="position:absolute;top:70px;left:10px;right:10px;z-index:9;background:#FF5FA2;color:#fff;padding:8px;border-radius:10px;font-size:12px";d.textContent="오류: "+e.message;document.body.appendChild(d)});
 addEventListener("resize",render);setInterval(render,30000);
 ui();initMap();
