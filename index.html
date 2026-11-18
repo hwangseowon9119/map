@@ -102,7 +102,7 @@ let booted=false;
 function boot(){
  if(booted)return;
  try{
-  if(!(window.ws3d&&ws3d.viewer&&ws3d.viewer.scene))return;
+  if(typeof ws3d==="undefined"||!ws3d.viewer||!ws3d.viewer.scene)return;
   booted=true;scene=ws3d.viewer.scene;
   try{map.getLayerElement("명칭").hide()}catch(e){}
   ["건물","facility_build"].forEach(n=>{try{const l=map.getLayerElement(n);l&&l.show&&l.show()}catch(e){}});
